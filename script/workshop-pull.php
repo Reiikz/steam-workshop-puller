@@ -48,12 +48,6 @@ foreach($apps["applist"]["apps"] as $app){
     }
 }
 
-//vomit out the matching names 'cause verbosity looks awesome
-// echo "Found apps matching name", $argv[1], "\n";
-// foreach($matching as $app){
-//     echo "[" , $app["appid"], "]:  ", $app["name"], "\n";
-// }
-
 //stress out the steam server by repeteadly asking it for the workshop of an app so I can evaluate the response
 //to figure out which of the apps matching the name input by the user has a workshop entry
 //reading steam doc was like, tldr, soooo, this was my first solution
@@ -88,6 +82,9 @@ foreach($matching as $app){
 echo "\n";
 
 ///////////////////// Extra stuff
+
+//I always wondered why libraries have to be so stupid at this level like, if I'm giving you a directory to copy why can't you just copy it
+//thx to these guys btw -> https://stackoverflow.com/questions/2050859/copy-entire-contents-of-a-directory-to-another-using-php
 function recurse_copy($src,$dst) { 
     $dir = opendir($src); 
     @mkdir($dst); 
@@ -104,25 +101,9 @@ function recurse_copy($src,$dst) {
     closedir($dir); 
 } 
 
-// function rmrf($dir){
-//     if(is_dir($dir)){
-//         $files = scandir($dir);
-//         foreach($files as $file){
-//             if($file != "." && $file != ".."){
-//                 if(is_dir($file)){
-//                     rmrf($file);
-//                 }else{
-//                     unlink($file);
-//                 }
-//             }
-//         }
-//     }else{
-//         if(file_exists($dir)){
-//             unlink($dir);
-//         }
-//     }
-// }
-
+//you know the drill if you're like me, just erase the fucking thing I don't care what it is
+//so you just do # sudo rm -rf thing
+//no I didn't write this function either -> https://stackoverflow.com/questions/31812511/im-getting-is-a-directory-error-when-trying-unlink-directory
 function rmrf($dir) { 
     if (is_dir($dir)) { 
         $objects = scandir($dir); 
@@ -140,9 +121,9 @@ function rmrf($dir) {
     }
 }
 
-
-///////////////////// Actually perform pulling the mods out
-
+//yes there will be windows (someday)
+//no mac tho
+//fuck macs
 function linux_retrieveSteamLibraries($steampath){
     $steamconfig = file_get_contents("$steampath/config/config.vdf");
     preg_match_all("/BaseInstallFolder_[0-9]+.*/", $steamconfig, $external_libraries);
@@ -155,13 +136,15 @@ function linux_retrieveSteamLibraries($steampath){
     return $external_libraries[0];
 }
 
+///////////////////// Actually perform pulling the mods out
+
 function doTheStuffThisScriptIsSupposedToDo($app){
     $steampath = "";
     if(PHP_OS == "Linux"){
         echo "Linux users beware this program was developed in Debian and may not be able to find your steam installation if running on a different OS, feel free to issue an enhancement on github\n";
         if(strpos(php_uname(), "Debian") !== false){
-            echo "Debian, assuming steam at $steampath\n";
             $steampath = str_replace("\n", "", shell_exec('echo ~')) . "/.steam/debian-installation";
+            echo "Debian, assuming steam at $steampath\n";
         }else{
             echo "Not implemented yet assuming Debian like locations...\n";
             $steampath = str_replace("\n", "", shell_exec('echo ~')) . "/.steam/debian-installation";
@@ -177,6 +160,7 @@ function doTheStuffThisScriptIsSupposedToDo($app){
         echo "Assuming Game Root: ",  $gameRoot, "\n";
         echo "Assuming workshop location: ", $workshop, "\n";
 
+        //not at all simple directory listing
         $mods = scandir($workshop);
 
         foreach($mods as $mod){
@@ -189,9 +173,13 @@ function doTheStuffThisScriptIsSupposedToDo($app){
                 $mod_info = file_get_contents("https://steamcommunity.com/sharedfiles/filedetails/?id=$mod");
                 file_put_contents("cache/$mod.modinfo.cachedhtml", $mod_info);
             }
+
+            //fancy title search techniques
             preg_match("/<div class=\"workshopItemTitle\">.*<\/div>/", $mod_info, $title);
             $title = str_replace("<div class=\"workshopItemTitle\">", "", $title[0]);
             $title = str_replace("</div>", "", $title);
+            
+            //ensure there's no slashes otherwise php thinks subdir obv
             $title = str_replace("/", "|", $title);
             echo "$title << copying into >> ", $app["name"], "/$title\n";
 
@@ -205,13 +193,19 @@ function doTheStuffThisScriptIsSupposedToDo($app){
             
         }
 
+        //I'm lazy and I'm assuming everyone else is lazy too, so I'm gessing no one will actually read this or want to interact with the program so it does this step anyways STONKS
         echo "Mod retrieaval done, creating reorganized structure (feel free to ctrl + c if you don't need the files outside the folders)\n";
+
+        //if you're a maniac you have 5 seconds to read that and cancel de operation
         sleep(5);
         $mods_folders = scandir($app["name"]);
         $ddir = $app["name"] . "_REORGANIZED";
         $dir = $app["name"];
         if(file_exists($ddir)) { rmrf($ddir); }
         mkdir($ddir);
+
+        //idk this part is black magic foreach loops always confuse me even more nested foreachs iterating on directories so I pass comenting this out
+        //if you are me from the future trying to figure out where the fuck is that obscure bug you found good lucl ;)
         foreach($mods_folders as $f){
             if($f == "." || $f == "..") continue;
             
@@ -224,6 +218,7 @@ function doTheStuffThisScriptIsSupposedToDo($app){
                 echo "   file: $ff\n";
 
                 if(!is_dir($ff)){
+                    //regexes are magic
                     preg_match("/\..*$/", $ff, $extension);
                     $extension = $extension[0];
                     $c = 0;
@@ -249,22 +244,15 @@ function doTheStuffThisScriptIsSupposedToDo($app){
                 echo "\n";
             }
         }
-        // $mods_folders = scandir($app["name"]);
-        // $ddir = $app["name"] . "_REORGANIZED";
-        // $dir = $app["name"];
-        // if(!file_exists($ddir)) mkdir($ddir);
-        // foreach($mods_folders as $f){
-        //     if($f == "." || $f == "..") continue;
-        //     if(!is_dir("$dir/$f")){
-        //         copy("$dir/$f", "$dir/$f" . "$ddir/$f");
-        //     }else{
-        //         recurse_copy("$dir/$f/*", "$ddir/");
-        //     }
-        // }
 
     }else{
         echo "Assuming windows...";
+        //fuck windows you get nothing
+        //what did you think?
+        //jk if someone wants to run this on windows I might implement it and test it out faster if they leave an issue on github
+        //no there's no other OS, appart from Debian and Windows
         echo "Not implemented, exiting";
+        //1000 is nice big number it also means the program failed
         exit(1000);
     }
 }
@@ -284,13 +272,14 @@ if($candidateCount > 0){
             echo "[$i]:  ", $candidates[$i]["name"], "\n";
         }
 
+        //I have no idea what this line does but the guy seems to have some hacker knowledge so I'll leave him be
         $in = readline();
         if(is_numeric($in)){
             if($in < 0 || $in >= $candidateCount){
                 echo "Hey chief that must be one of the numbers above\n";
                 exit(0);
             }else{
-
+                //tottally professional short and not at all obfuscated function name, go figure
                 doTheStuffThisScriptIsSupposedToDo($candidates[$in]);
             }
         }else{
@@ -307,3 +296,5 @@ if($candidateCount > 0){
     echo "Unable to find any suitable candidates for workshop download\n";
     exit(0);
 }
+
+//yes making unfunny stupid comments on the code was a tottally necessary thing to do and if it doesn't help you read it again.
