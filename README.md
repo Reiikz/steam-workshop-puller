@@ -2,7 +2,7 @@
 Pulls out the workshop items you've installed for a given game
 
 ## How to use:
-php workshop-pull.php "<your workshop enabled game name goes here here>"
+php workshop-pull.php "your workshop enabled game name goes here here"
 
 ## Theory of operation
 The script downloads the steamapps list and searches for matching names, then it tests if there's a workshop option on the app's page.
